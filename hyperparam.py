@@ -12,9 +12,9 @@ D_FF   = ( 5,10)
 LR     = (-4,-9)
 
 #NOT TUNED PARAMETERS
-EPOCHS     = 32
+EPOCHS     = 64
 N_ITS      = 512
-BATCH_SIZE = 64
+BATCH_SIZE = 32
 VERBOSE    = True
 
 
@@ -31,7 +31,7 @@ def search_space(n_layers, n_models, device, dset):
             name = f"model_{n_layers}_{n_dims}_{nheads}_{d_ff}_{lr}"
             metrics = {"loss":[], "eval":[]}
 
-            model =  Base(device, dset.get_max_len(), dset.get_num_tokens(), dim=n_dims, \
+            model =  Base(device, 2*dset.get_max_len(), dset.get_num_tokens(), dim=n_dims, \
                           nhead=nheads, num_encoders=n_layers, num_decoders=n_layers,    \
                           d_feedforward=d_ff).to(device)
 

@@ -6,14 +6,16 @@ import torch
 import sys
 
 if torch.backends.mps.is_available():
+    print("MPS")
     device = torch.device('mps')
-else if torch.cuda.is_available():
+elif torch.cuda.is_available():
+    print("CUDA")
     device = torch.device('cuda')
-else
+else:
     print("WARNING CPU IN USE")
     device = torch.device('cpu')
 
-dset = Arithmetic(max_val=1e3, test_data=False)
+dset = Arithmetic(max_val=1e7, test_data=True)
 
 
 def test_search_space():
@@ -23,11 +25,11 @@ def test_search_space():
     """
     """
     FOR LAPTOP
-    #search_space(8, 10, device, dset)
+    #search_space(4, 10, device, dset)
     """
     """
     FOR DESKTOP
-    search_space(16, 10, device, dset)
+    search_space(8, 10, device, dset)
     """
 
 test_search_space()
