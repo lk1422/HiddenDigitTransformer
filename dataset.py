@@ -33,7 +33,7 @@ class Arithmetic:
         #STORE THE LARGETS POSSIBLE ARITHMETIC RESULTING VALUE
         self.maximum_operand = max_val
         self.maximum_result = max_val**2+1
-        self.max_len = len(str(self.maximum_operand))*2 + 6
+        self.max_len = len(str(int(self.maximum_operand)))*2 + 6
         self.num_tokens = len(self.TOKENS)
         self.test_data = test_data
         ##Add Tests for generalization to larger numbers
@@ -90,9 +90,8 @@ class Arithmetic:
         elif operation == "*":
             result = operand1 * operand2
 
-        result = str(result)
-        expression = str(operand1) + operation + str(operand2)
-
+        result = str(int(result))
+        expression = str(int(operand1)) + operation + str(int(operand2))
         return  self.tokenize_expression(expression), self.tokenize_expression(result)
 
     def tokenize_expression(self, exp:str):

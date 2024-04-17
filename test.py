@@ -1,37 +1,33 @@
 from dataset import Arithmetic
 from models import Base
 from train import *
+from hyperparam import search_space
 import torch
 import sys
 
-def generate_sequence(model, device, src, max_len, pad_idx, sos_idx, eos_idx):
-    toks = [sos_idx]
-    i = 0
-    while toks[-1] != eos_idx and i < max_len-1:
-        tgt = torch.tensor([toks], dtype=torch.int64).to(device)
-        pred = model(src, tgt, pad_idx)
-        next_ = torch.argmax(pred[0, -1], dim=-1).item()
-        toks.append(next_)
-        i+=1
-    return toks
+if torch.backends.mps.is_available():
+    device = torch.device('mps')
+else if torch.cuda.is_available():
+    device = torch.device('cuda')
+else
+    print("WARNING CPU IN USE")
+    device = torch.device('cpu')
 
-def answer(expr, device, dataset):
-    tensor = dset.get_tensor(expr).to(device)
-    output = generate_sequence(model, device, tensor, dset.get_max_len(), \
-            dset.get_pad_idx(), dset.get_sos_idx(), dset.get_eos_idx())
-    print(dset.get_str(output))
+dset = Arithmetic(max_val=1e3, test_data=False)
 
 
-dset = Arithmetic(max_val=11, test_data=False)
-x,y = dset.get_batch(1)
-batch = dset.get_batch(1)
-device = torch.device('cuda')
-model = Base(device, dset.get_max_len(), dset.get_num_tokens(), d_feedforward=64, dim=16).to(device)
-loss = torch.nn.CrossEntropyLoss(ignore_index=dset.get_pad_idx())
-optim = torch.optim.Adam(params=model.parameters())
-train(model, device, 10, 32, 256, loss, optim, dset, None)
-model.eval()
-answer("5+5", device, dset)
-answer("1+1", device, dset)
-answer("-1+-1", device, dset)
+def test_search_space():
+    """
+    FOR SAMIR TO RUN
+    search_space(2, 10, device, dset)
+    """
+    """
+    FOR LAPTOP
+    #search_space(8, 10, device, dset)
+    """
+    """
+    FOR DESKTOP
+    search_space(16, 10, device, dset)
+    """
 
+test_search_space()
