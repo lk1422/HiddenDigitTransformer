@@ -13,7 +13,7 @@ D_FF   = ( 5,10)
 LR     = (-4,-9)
 
 #NOT TUNED PARAMETERS
-EPOCHS     = 64
+EPOCHS     = 512
 N_ITS      = 512
 BATCH_SIZE = 32
 VERBOSE    = True
@@ -22,18 +22,20 @@ VERBOSE    = True
 METRIC_FILE    = "/media/lenny/e8491f8e-2ac1-4d31-a37f-c115e009ec90/hidden_digits/logs/"
 PARAMETER_FILE = "/media/lenny/e8491f8e-2ac1-4d31-a37f-c115e009ec90/hidden_digits/params/"
 
-def train_custom(dset, device, n_layers, n_dims, n_heads, d_ff, lr):
-    name = f"model2_{n_layers}_{n_dims}_{n_heads}_{d_ff}_{lr}"
+def train_custom(dset, device, n_layers, n_dims, n_heads, d_ff, lr, pth=None):
+    name = f"model3_{n_layers}_{n_dims}_{n_heads}_{d_ff}_{lr}"
     metrics = {"loss":[], "eval":[]}
     model =  Base(device, 2*dset.get_max_len(), dset.get_num_tokens(), dim=n_dims, \
                   nhead=n_heads, num_encoders=n_layers, num_decoders=n_layers,    \
                   d_feedforward=d_ff).to(device)
+    if pth!= None:
+        model.load_state_dict(torch.load(PARAMETER_FILE+pth))
 
     learning_rate = lr
     loss = torch.nn.CrossEntropyLoss(ignore_index=dset.get_pad_idx())
     optim = torch.optim.Adam(params=model.parameters(), lr=learning_rate)
     train(model, device, EPOCHS, BATCH_SIZE, N_ITS, loss, optim, dset, metrics, \
-        PARAMETER_FILE, name, verbose=VERBOSE)
+        PARAMETER_FILE, name, verbose=VERBOSE, killable=False)
 
     with open(METRIC_FILE+name+".json", 'w') as f:
         json.dump(metrics, f)

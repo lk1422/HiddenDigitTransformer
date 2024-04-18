@@ -53,7 +53,8 @@ class Base(nn.Module):
                                          num_decoder_layers=num_decoders, dim_feedforward=d_feedforward, \
                                          dropout=dropout, batch_first=batch_first)
         ##Create Final Linear Layer##
-        self.linear = nn.Linear(dim, num_tokens)
+        self.policy_head = nn.Sequential(*[nn.Linear(dim, num_tokens*2), nn.ReLU(), nn.Linear(num_tokens*2, num_tokens)])
+        self.value_head  = nn.Sequential(*[nn.Linear(dim, dim*2), nn.ReLU(), nn.Linear(dim*2, 1)])
 
     def get_src_pad_mask(src, pad_idx):
         return src == pad_idx
@@ -66,5 +67,5 @@ class Base(nn.Module):
         trans_out = self.transformer(src=src_in, tgt=tgt_in, tgt_mask=casual_mask, \
                     src_key_padding_mask=pad_mask)
         #raise RuntimeError("FUCK")
-        return self.linear(trans_out)
+        return self.policy_head(trans_out)
 

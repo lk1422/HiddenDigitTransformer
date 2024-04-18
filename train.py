@@ -16,7 +16,7 @@ def eval(model, device, dset):
     train_acc = get_accuracy(model, device, dset, 512, test=True)
     return (test_acc, train_acc)
 
-def train(model, device, epoch, batch_size, n_iterations, loss, optim, dset, metrics, path, name, verbose=False):
+def train(model, device, epoch, batch_size, n_iterations, loss, optim, dset, metrics, path, name, verbose=False, killable=True):
     pad_idx = dset.get_pad_idx()
     losses = []
     for e in range(epoch):
@@ -46,7 +46,7 @@ def train(model, device, epoch, batch_size, n_iterations, loss, optim, dset, met
             print("=="*10)
         if len(losses) != 3:
             losses.append(epoch_loss)
-        if len(losses) == 3:
+        if len(losses) == 3 and killable:
             if abs(losses[2] - losses[0]) < 0.1:
                 print("KILLED")
                 metrics["KILLED"] = True

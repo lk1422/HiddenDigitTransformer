@@ -16,7 +16,7 @@ else:
     device = torch.device('cpu')
 
 dset = Arithmetic(max_val=1e4, test_data=True)
-train_custom(dset, device, 4, 256, 32, 1024, 3e-4)
+train_custom(dset, device, 4, 256, 32, 1024, 1e-3)
 
 
 def test_search_space():
