@@ -80,7 +80,9 @@ class Arithmetic:
         else:
             operand1 = random.randint(int(-self.maximum_operand/2) , int(self.maximum_operand/2) )
             operand2 = random.randint(int(-self.maximum_operand/2) , int(self.maximum_operand/2) )
-        operation = random.choice(["+", "-", "*"])
+        operation = "*"
+        #operation = random.choice(["+", "-", "*"])
+        #operation = random.choice(["+", "-"])
 
         result = 0
         if operation == "+":
