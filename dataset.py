@@ -52,8 +52,12 @@ class Arithmetic:
     def get_eos_idx(self):
         return self.TOKENS["<EOS>"]
     
+    def get_hidden_token(self):
+        return self.TOKENS[HIDDEN_START]
+
     def get_num_tokens(self):
         return self.num_tokens
+
 
     def get_batch(self, batch_size, test=False):
         """

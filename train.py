@@ -1,6 +1,9 @@
 import torch
 import torch.nn as nn
 import torch.nn.functional as F
+from util import *
+import copy
+from models import *
 
 def get_accuracy(model, device, dset, batch_size, test=False):
     ##Fix to ignore Pad accuracy
@@ -11,10 +14,41 @@ def get_accuracy(model, device, dset, batch_size, test=False):
     out = torch.argmax(model(x,y, pad_idx), dim=-1)
     return ((out == y_).sum() / (torch.ones_like(out).sum())).item()
 
-def eval(model, device, dset):
+def eval(model, device, dset, epochs, sub_epochs, batch_size):
     test_acc = get_accuracy(model, device, dset, 512, test=True), 
     train_acc = get_accuracy(model, device, dset, 512, test=True)
     return (test_acc, train_acc)
+
+def trainPPO(model, device, dset, epochs, sub_epochs, batch_size, eps, optim, metric, path, name):
+    model_old = copy.deepcopy(model)
+    loss = clippedLoss()
+    for e in range(epochs):
+        src, tgt = dset.get_batch(batch_size)
+        src,tgt = src.to(device), tgt.to(device)
+        gen = generate_batched_sequence(model, src, device, dset)
+        reward = get_reward(gen, tgt, dset, device).to(device)
+        pad_idx = dset.get_pad_idx()
+        eos_idx = dset.get_eos_idx()
+
+        temp_model = copy.deepcopy(model)
+        avg_loss = 0
+        for s_e in range(sub_epochs):
+            optim.zero_grad()
+            l = loss(model, model_old, eps, src, gen, reward, pad_idx, eos_idx, device)
+            l.backward()
+            avg_loss+=l.item()
+
+        avg_loss = avg_loss/sub_epochs
+        avg_reward = reward.sum()/batch_size
+        metric["loss"].append(avg_loss)
+        metric["reward"].append(avg_reward)
+        print("EPOCH", e+1)
+        print("Average Loss", avg_loss)
+        print("Average Reward", avg_reward)
+        print("="*10)
+        torch.save(model.state_dict(), path+name+f"_epoch_{e}.pth")
+        model_old = temp_model
+
 
 def train(model, device, epoch, batch_size, n_iterations, loss, optim, dset, metrics, path, name, verbose=False, killable=True):
     pad_idx = dset.get_pad_idx()

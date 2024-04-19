@@ -13,7 +13,7 @@ D_FF   = ( 5,10)
 LR     = (-4,-9)
 
 #NOT TUNED PARAMETERS
-EPOCHS     = 512
+EPOCHS     = 1024
 N_ITS      = 512
 BATCH_SIZE = 32
 VERBOSE    = True
