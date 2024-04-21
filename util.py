@@ -1,8 +1,9 @@
 import torch
 from torch.distributions import Categorical
 import torch.nn.functional as F
+import random
 
-def generate_batched_sequence(model, src, device, dset, noise=False):
+def generate_batched_sequence(model, src, device, dset, hidden_prob=0):
     #src (N, s)
     tgt = torch.ones(src.shape[0]).to(torch.int64) * dset.get_sos_idx()
     eos_detected = torch.zeros(src.shape[0]).to(torch.bool).to(device)
@@ -14,7 +15,11 @@ def generate_batched_sequence(model, src, device, dset, noise=False):
         policy = model(src, tgt, dset.get_pad_idx())
         next_token_policy = F.softmax(policy[:, -1], dim=-1)
         next_tokens = Categorical(next_token_policy).sample().unsqueeze(1)
-        eos_detected = eos_detected | (next_tokens == dset.get_eos_idx())
+        hidden_mask = (torch.rand(*next_tokens.shape) < hidden_prob).to(device)
+        hidden_tokens = torch.ones_like(next_tokens) * dset.get_hidden_token()
+        hidden_tokens = hidden_tokens.to(device)
+        next_tokens   =  torch.logical_not(hidden_mask) * next_tokens + hidden_mask*hidden_tokens
+        eos_detected  = eos_detected | (next_tokens == dset.get_eos_idx())
         tgt = torch.concat((tgt, next_tokens), dim=1)
         it+=1
     return tgt
@@ -54,9 +59,6 @@ def check_example(y_hat, tgt, dset):
             tgt_ptr += 1
 
     return 0
-
-
-
 
 def get_reward(y_hat, tgt, dset, device):
     reward = torch.zeros(tgt.shape[0])

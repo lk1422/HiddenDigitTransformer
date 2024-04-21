@@ -71,20 +71,29 @@ def test_loss():
     eos_idx = dset.get_eos_idx()
     print(loss(model, model_old, eps, src, gen, reward, pad_idx, eos_idx, device))
 
+def freeze(model):
+    for p in model.parameters():
+        p.requires_grad=False
+def unfreeze(model):
+    for p in model.parameters():
+        p.requires_grad=True
+
 def trainRL():
     model = Base(device, 2*dset.get_max_len(), dset.get_num_tokens(), dim=256, \
             nhead=32, num_encoders=4, num_decoders=4, d_feedforward=1024)
-    params = torch.load(param_file+"model3_4_256_32_1024_0.0001_epoch_1023.pth")
-    model.load_state_dict(params)
+    #params = torch.load(param_file+"PPO_Value_Pretrained.pth")
+    #model.load_state_dict(params)
+    #unfreeze(model)
     model = model.to(device)
-    epochs = 3000
+    epochs = 10000
     sub_epochs = 32
     batch_size = 128
     eps = 0.2
-    optim = torch.optim.Adam(model.parameters(), lr=3e-7)
-    name = "modelPPO"
+    optim = torch.optim.Adam(model.parameters(), lr=3e-5)
+    name = "modelPPOFresh"
     metric = {"loss": [], "reward": []}
-    trainPPO(model, device, dset, epochs, sub_epochs, batch_size, eps, optim, metric, param_file, name)
+    c_1 = 0.5
+    trainPPO(model, device, dset, epochs, sub_epochs, batch_size, eps, c_1, optim, metric, param_file, name, 150, 0.99)
     with open(METRIC_FILE+name+".json", 'w') as f:
         json.dump(metric, f)
 

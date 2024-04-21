@@ -45,7 +45,7 @@ class Base(nn.Module):
         self.device = device
         self.tokens = num_tokens
         ##Create encoder layers##
-        self.src_emb = nn.Embedding(num_tokens, dim)
+        self.src_emb = nn.Embedding(num_tokens, dim) 
         self.tgt_emb = nn.Embedding(num_tokens, dim)
         self.pos_emb = PositionalEncoding(dim, max_len=max_len)
         ##Create Transformer##
@@ -76,7 +76,7 @@ class clippedLoss(nn.Module):
     def __init__(self):
         super().__init__()
 
-    def forward(self, model, model_old, eps, src, generated, rewards, pad_idx, eos_idx, device):
+    def forward(self, model, model_old, eps, c_1, src, generated, rewards, pad_idx, eos_idx, device):
 
         model.eval()
         model_old.eval()
@@ -107,8 +107,12 @@ class clippedLoss(nn.Module):
         value = value.squeeze(-1)
         A = (rewards - value)
 
-        l_clip = -(torch.min(r*A, r_clipped*A) * eos_mask)
+        #l_clip = (torch.min(r*A, r_clipped*A) * eos_mask)
+        l_clip = torch.min(r*A, r_clipped*A) 
+        l_clip = l_clip.sum()/(N*eos_mask.sum())
 
+        rewards = rewards * eos_mask
+        value = value * eos_mask
         rewards = rewards.reshape(-1,1)
         value   = value.reshape(-1,1)
 
@@ -117,8 +121,11 @@ class clippedLoss(nn.Module):
         model.train()
         model_old.train()
 
+        #print(l_value)
+        #print(l_clip, l_value)
+        #return l_value
 
-        return l_clip.sum()/(N*S) + l_value
+        return -l_clip + c_1*l_value
 
 
 

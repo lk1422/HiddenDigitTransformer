@@ -19,13 +19,14 @@ def eval(model, device, dset, epochs, sub_epochs, batch_size):
     train_acc = get_accuracy(model, device, dset, 512, test=True)
     return (test_acc, train_acc)
 
-def trainPPO(model, device, dset, epochs, sub_epochs, batch_size, eps, optim, metric, path, name):
+def trainPPO(model, device, dset, epochs, sub_epochs, batch_size, eps, c_1, optim, metric, path, name, hidden_step, hidden_decay):
     model_old = copy.deepcopy(model)
     loss = clippedLoss()
+    hidden_prob = 0.01
     for e in range(epochs):
         src, tgt = dset.get_batch(batch_size)
         src,tgt = src.to(device), tgt.to(device)
-        gen = generate_batched_sequence(model, src, device, dset)
+        gen = generate_batched_sequence(model, src, device, dset, hidden_prob=hidden_prob)
         reward = get_reward(gen, tgt, dset, device).to(device)
         pad_idx = dset.get_pad_idx()
         eos_idx = dset.get_eos_idx()
@@ -34,8 +35,9 @@ def trainPPO(model, device, dset, epochs, sub_epochs, batch_size, eps, optim, me
         avg_loss = 0
         for s_e in range(sub_epochs):
             optim.zero_grad()
-            l = loss(model, model_old, eps, src, gen, reward, pad_idx, eos_idx, device)
+            l = loss(model, model_old, eps, c_1, src, gen, reward, pad_idx, eos_idx, device)
             l.backward()
+            optim.step()
             avg_loss+=l.item()
 
         avg_loss = avg_loss/sub_epochs
@@ -46,7 +48,12 @@ def trainPPO(model, device, dset, epochs, sub_epochs, batch_size, eps, optim, me
         print("Average Loss", avg_loss)
         print("Average Reward", avg_reward)
         print("="*10)
-        torch.save(model.state_dict(), path+name+f"_epoch_{e}.pth")
+
+        if e % hidden_step == 0 and e != 0:
+            hidden_prob*=hidden_decay
+        if e % 100 == 0 and e != 0:
+            torch.save(model.state_dict(), path+name+f"_epoch_{e}.pth")
+
         model_old = temp_model
 
 
