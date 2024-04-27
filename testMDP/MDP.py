@@ -25,7 +25,7 @@ class basicMDP():
         self.rewards[0, 1] =  1
         self.rewards[0, 2] = -5
         self.rewards[3, 2] = -5
-        self.rewards[3, 4] = 10
+        self.rewards[3, 4] = 50
 
     def _init_transition_probs(self):
         """
