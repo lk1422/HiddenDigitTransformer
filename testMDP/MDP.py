@@ -1,7 +1,73 @@
 import numpy as np
+from .utils import softmax
 
 LEFT  = 0
 RIGHT = 1
+UP    = 2
+DOWN  = 3
+
+OUT_OF_BOUND_REWARD = -5
+WIN_REWARD = 10
+
+class RandomGridWorld():
+    """
+    Slightly More complicated RL Enviorment.
+    To test the ability of PPO of converging upon more
+    complex policy
+    """
+    def __init__(self, rows, cols):
+        """
+        Initialize RandomGridWorld object
+
+        Parameters:
+            rows: # of rows present in random grid (rows > 1)
+            cols: # of columbs present in random grid (cols > 1)
+
+        Class Members:
+            self.pr = PR(ACTION | row, col, REQUESTED_ACTION)
+            ie the P(UP | 1, 2, DOWN) is the probability that the 
+            action preformed is down given the state and action.
+
+            self.reward(row, col, action) is the reward for preforming an 
+            action in some state.
+
+            self.terminal_states(row, col) <==> row,col is a terminal state
+
+            S : start = (1,1)
+            D : dest  = (3,3)
+            X : out of grid
+            |X|X|X|X|X|
+            |X|S|.|.|X|
+            |X|.|.|.|X|
+            |X|.|.|D|X|
+            |X|X|X|X|X|
+
+        """
+        assert rows > 1, "rows <= 1 is not valid"
+        assert cols > 1, "cols <= 1 is not valid"
+        
+        self.rows = rows
+        self.cols = cols
+        self.states = (rows+2) * (cols+2)
+        self._init_rewards()
+        self._init_terminal_states()
+        self.pr = softmax(np.random.randn(4, rows+2,cols+2, 4))
+
+    def _init_rewards(self):
+        self.rewards = np.random.randn(self.rows+2, self.cols+2, 4)
+        self.rewards[self.rows+1, :, DOWN] = OUT_OF_BOUND_REWARD
+        self.rewards[:, self.cols+1, RIGHT] = OUT_OF_BOUND_REWARD
+        self.rewards[0, :, UP] = OUT_OF_BOUND_REWARD
+        self.rewards[:, 0, LEFT] = OUT_OF_BOUND_REWARD
+        self.rewards[self.rows-1, self.cols, DOWN] = WIN_REWARD
+        self.rewards[self.rows, self.cols-1, RIGHT] = WIN_REWARD
+
+    def _init_terminal_states(self):
+        self.terminal_states = np.zeros((self.rows+2, self.cols+2))
+        self.terminal_states[self.rows+1, :] = 1
+        self.terminal_states[0, :] = 1
+        self.terminal_states[:, self.cols+1] = 1
+        self.terminal_states[:, 0] = 1
 
 class basicMDP():
     """
@@ -78,10 +144,4 @@ class basicMDP():
         terminal = (next_state == 1) | (next_state == 2) | (next_state == 4) | (next_state == 6)
 
         return next_state_binary, rewards, terminal
-
-
-
-
-
-
 

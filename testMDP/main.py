@@ -87,7 +87,7 @@ def trainPPO(model, device, mdp, epochs, sub_epochs, batch_size, eps, c_1, c_2, 
 
 
 
-def main():
+def mainMDP():
     mdp = basicMDP()
     start = mdp.get_start_state(5).astype(np.int32)
     actions = np.zeros(5).astype(np.int32)
@@ -139,5 +139,11 @@ def testMDP():
     ax[1].plot(T, rewards)
     plt.show()
 
+def mainGridWorld():
+    gw = RandomGridWorld(4,4)
+    print(gw.rewards[:,:, 1])
+    print(gw.pr[:,0,0,0])
+    print(gw.terminal_states)
+
 if __name__ == "__main__":
-    testModel()
+    mainGridWorld()
