@@ -141,9 +141,14 @@ def testMDP():
 
 def mainGridWorld():
     gw = RandomGridWorld(4,4)
-    print(gw.rewards[:,:, 1])
-    print(gw.pr[:,0,0,0])
-    print(gw.terminal_states)
+    batched_input = np.arange(0, gw.states).reshape(-1, 1)
+    actions = np.random.randint(0,4)
+    print(gw.batched_step(batched_input, actions))
+
+    #print(batched_input)
+    #print(gw.rewards[:,:, 1])
+    #print(gw.pr[:,0,0,0])
+    #print(gw.terminal_states)
 
 if __name__ == "__main__":
     mainGridWorld()

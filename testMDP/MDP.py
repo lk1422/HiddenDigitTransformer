@@ -55,10 +55,10 @@ class RandomGridWorld():
 
     def _init_rewards(self):
         self.rewards = np.random.randn(self.rows+2, self.cols+2, 4)
-        self.rewards[self.rows+1, :, DOWN] = OUT_OF_BOUND_REWARD
-        self.rewards[:, self.cols+1, RIGHT] = OUT_OF_BOUND_REWARD
-        self.rewards[0, :, UP] = OUT_OF_BOUND_REWARD
-        self.rewards[:, 0, LEFT] = OUT_OF_BOUND_REWARD
+        self.rewards[self.rows, :, DOWN] = OUT_OF_BOUND_REWARD
+        self.rewards[:, self.cols, RIGHT] = OUT_OF_BOUND_REWARD
+        self.rewards[1, :, UP] = OUT_OF_BOUND_REWARD
+        self.rewards[:, 1, LEFT] = OUT_OF_BOUND_REWARD
         self.rewards[self.rows-1, self.cols, DOWN] = WIN_REWARD
         self.rewards[self.rows, self.cols-1, RIGHT] = WIN_REWARD
 
@@ -68,6 +68,67 @@ class RandomGridWorld():
         self.terminal_states[0, :] = 1
         self.terminal_states[:, self.cols+1] = 1
         self.terminal_states[:, 0] = 1
+
+    def get_state_idx(self, row, col):
+        """
+        Convert row, col to => 0 - self.states
+        each row, col pair maps to a unique number 
+        in this range. This is to represent the token_idx.
+        """
+        assert row >= 0 and row < self.rows+2, "OUT OF BOUNDS ROW"
+        assert col >= 0 and col < self.rows+2, "OUT OF BOUNDS ROW"
+        return row * (self.cols+2) + col
+
+    def get_start_state(n):
+        return np.ones((n,1)) * self.get_state_idx(1,1)
+
+    def preform_action(self, state, actions):
+        """
+        Preform the randomly generated action on the state
+        """
+
+        state = state.reshape(-1)
+
+        is_up    = (actions==UP)
+        is_down  = (actions==DOWN)
+        is_left  = (actions==LEFT)
+        is_right = (actions==RIGHT)
+
+        action_up = state - (self.cols+2)
+        action_down = state + (self.cols+2)
+        action_left = state - 1
+        action_right = state + 1
+        
+        preformed_action = (is_up * action_up) + (is_down * action_down) + \
+                (is_left * action_left) + (is_right * action_right)
+
+        terminal = self.terminal_states.reshape(-1)
+
+
+        return (terminal * state) + \
+                (np.logical_not(terminal) * preformed_action)
+
+    def batched_step(self, state, action):
+        """
+        state : (N, 6) current_state array
+        action: (N,) action array 
+        Returns (next_states, rewards, Terminal)
+        """
+        N = state.shape[0]
+
+        row_idx = (state / (self.cols+2)).astype(np.int32).reshape(-1)
+        col_idx = (state % (self.cols+2)).astype(np.int32).reshape(-1)
+
+        probs = self.pr[:, row_idx, col_idx, action]
+        action_preformed = np.array([np.random.choice(a=4, p=probs[:,i]) \
+                       for i in range(N)]).reshape(-1)
+
+        preform_action = self.preform_action(state, action_preformed).astype(np.int32)
+        terminal = self.terminal_states.reshape(-1)
+        rewards = self.rewards[row_idx,  col_idx, action_preformed]
+
+
+        return preform_action, rewards, (terminal[preform_action]).astype(np.int32)
 
 class basicMDP():
     """
