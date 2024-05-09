@@ -32,6 +32,7 @@ class BaseTokens(nn.Module):
     def __init__(self, device,
                     max_len,
                     num_tokens,
+                    num_out_tokens,
                     dim=64,
                     nhead=8,
                     num_encoders=2,
@@ -53,7 +54,7 @@ class BaseTokens(nn.Module):
                                          num_decoder_layers=num_decoders, dim_feedforward=d_feedforward, \
                                          dropout=dropout, batch_first=batch_first)
         ##Create Final Linear Layer##
-        self.policy_head = nn.Sequential(*[nn.Linear(dim, num_tokens), nn.ReLU(), nn.Linear(num_tokens, num_tokens)])
+        self.policy_head = nn.Sequential(*[nn.Linear(dim, num_tokens), nn.ReLU(), nn.Linear(num_tokens, num_out_tokens)])
         self.value_head  = nn.Sequential(*[nn.Linear(dim, dim), nn.ReLU(), nn.Linear(dim, 1)])
 
     def get_src_pad_mask(src, pad_idx):
@@ -63,7 +64,7 @@ class BaseTokens(nn.Module):
         src_in = self.pos_emb(self.src_emb(src))
         tgt_in = self.pos_emb(self.tgt_emb(tgt))
         casual_mask = self.transformer.generate_square_subsequent_mask(tgt.shape[1])
-        pad_mask = Base.get_src_pad_mask(src, pad_idx)
+        pad_mask = BaseTokens.get_src_pad_mask(src, pad_idx)
         trans_out = self.transformer(src=src_in, tgt=tgt_in, tgt_mask=casual_mask, \
                     src_key_padding_mask=pad_mask)
         if value:

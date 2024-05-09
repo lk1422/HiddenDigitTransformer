@@ -88,7 +88,7 @@ class clippedLossSequential(nn.Module):
     def __init__(self):
         super().__init__()
 
-    def forward(self, model, model_old, eps, c_1, src, generated, rewards, pad_idx, eos_idx, device):
+    def forward(self, model, model_old, eps, c_1, c_2, src, generated, rewards, pad_idx, eos_idx, device):
 
         model.eval()
         model_old.eval()
@@ -103,8 +103,11 @@ class clippedLossSequential(nn.Module):
 
         policy, value = model(src, generated, pad_idx, value=True)
         policy_old    = model_old(src, generated, pad_idx)
-        policy = F.softmax(policy, dim=1)
-        policy_old = F.softmax(policy_old, dim=1)
+        policy = F.softmax(policy, dim=-1)
+        policy_old = F.softmax(policy_old, dim=-1)
+
+        entropy = -(policy*torch.log(policy)).sum(dim=-1)
+        entropy_loss = (1/torch.numel(entropy)) * entropy.sum()
 
         batch_index = torch.arange(N).unsqueeze(1).expand(N,S)
         state_index = torch.arange(S).expand(N,S)
@@ -119,8 +122,8 @@ class clippedLossSequential(nn.Module):
         value = value.squeeze(-1)
         A = (rewards - value)
 
-        #l_clip = (torch.min(r*A, r_clipped*A) * eos_mask)
-        l_clip = torch.min(r*A, r_clipped*A) 
+        #l_clip = torch.min(r*A, r_clipped*A) 
+        l_clip = (torch.min(r*A, r_clipped*A) * eos_mask)
         l_clip = l_clip.sum()/(N*eos_mask.sum())
 
         rewards = rewards * eos_mask
@@ -134,5 +137,5 @@ class clippedLossSequential(nn.Module):
         model_old.train()
 
 
-        return -l_clip + c_1*l_value
+        return -l_clip + c_1*l_value - c_2 * entropy_loss
 

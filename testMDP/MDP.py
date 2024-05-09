@@ -48,13 +48,17 @@ class RandomGridWorld():
         
         self.rows = rows
         self.cols = cols
+
         self.states = (rows+2) * (cols+2)
+        self.SOS = self.states+1
+        self.PAD = self.states+2
+
         self._init_rewards()
         self._init_terminal_states()
         self.pr = softmax(np.random.randn(4, rows+2,cols+2, 4))
 
     def _init_rewards(self):
-        self.rewards = np.random.randn(self.rows+2, self.cols+2, 4)
+        self.rewards = -np.random.uniform(low=0, high=1, size=(self.rows+2, self.cols+2, 4))
         self.rewards[self.rows, :, DOWN] = OUT_OF_BOUND_REWARD
         self.rewards[:, self.cols, RIGHT] = OUT_OF_BOUND_REWARD
         self.rewards[1, :, UP] = OUT_OF_BOUND_REWARD
@@ -79,8 +83,8 @@ class RandomGridWorld():
         assert col >= 0 and col < self.rows+2, "OUT OF BOUNDS ROW"
         return row * (self.cols+2) + col
 
-    def get_start_state(n):
-        return np.ones((n,1)) * self.get_state_idx(1,1)
+    def get_start_state(self, n):
+        return (np.ones((n,1)) * self.get_state_idx(1,1)).astype(np.int32)
 
     def preform_action(self, state, actions):
         """
@@ -102,8 +106,7 @@ class RandomGridWorld():
         preformed_action = (is_up * action_up) + (is_down * action_down) + \
                 (is_left * action_left) + (is_right * action_right)
 
-        terminal = self.terminal_states.reshape(-1)
-
+        terminal = self.terminal_states.reshape(-1)[state]
 
         return (terminal * state) + \
                 (np.logical_not(terminal) * preformed_action)
@@ -116,8 +119,15 @@ class RandomGridWorld():
         """
         N = state.shape[0]
 
+        print("STATE", state)
+        print("ACTION", action)
+
         row_idx = (state / (self.cols+2)).astype(np.int32).reshape(-1)
         col_idx = (state % (self.cols+2)).astype(np.int32).reshape(-1)
+
+        print(row_idx)
+        print(col_idx)
+
 
         probs = self.pr[:, row_idx, col_idx, action]
         action_preformed = np.array([np.random.choice(a=4, p=probs[:,i]) \

@@ -5,6 +5,8 @@ from PPO.PPO import clippedLossVector
 import numpy as np
 import torch
 import matplotlib.pyplot as plt
+from .utils import *
+
 
 device = torch.device('cuda')
 #torch.manual_seed(1)
@@ -140,10 +142,12 @@ def testMDP():
     plt.show()
 
 def mainGridWorld():
-    gw = RandomGridWorld(4,4)
-    batched_input = np.arange(0, gw.states).reshape(-1, 1)
-    actions = np.random.randint(0,4)
-    print(gw.batched_step(batched_input, actions))
+    gw = RandomGridWorld(3,3)
+    model = BaseTokens(device, gw.states, gw.states+2, 4).to(device)
+    generate_sequence_grid_world(model, gw, 2, device)
+
+
+
 
     #print(batched_input)
     #print(gw.rewards[:,:, 1])

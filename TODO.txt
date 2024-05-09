@@ -1,6 +1,5 @@
 TODO:
     -Create Basic Grid World MDP
-        * Randomly Generated
         * TD Tabular Solution Finder
-        * Token Transformer not VectorTransformer(ViT)
+        * Complete PPO generalization (GAE + action_output != #tokens)
     -Test PPO Transformer's optimal solution 
