@@ -6,91 +6,124 @@ RIGHT = 1
 UP    = 2
 DOWN  = 3
 
-OUT_OF_BOUND_REWARD = -5
-WIN_REWARD = 10
 
-class RandomGridWorld():
+class GridWorld():
     """
     Slightly More complicated RL Enviorment.
     To test the ability of PPO of converging upon more
-    complex policy
+    complex policy.
     """
-    def __init__(self, rows, cols):
+    def __init__(self, gw_file):
         """
-        Initialize RandomGridWorld object
+        Initialize GridWorld object
 
         Parameters:
-            rows: # of rows present in random grid (rows > 1)
-            cols: # of columbs present in random grid (cols > 1)
+            gw_file: file specifiying the format of the gw
+
+            step_reward,fail_reward,destination_reward,probability_failure
+            step_reward: reward at each time step (should be negative to
+                         push the agent toward completing the maze)
+            fail_reward: reward for episode terminating without reaching the destination
+                         (agent goes into a terminal location).
+            destination_reward: reward for reaching destination
+            probability_failure: the probability of a given action not being preformed
+                                 ie P(UP| UP) = (1-probability_failure), the rest of the
+                                 possible actions are equally as likely (failure / 3).
+
+            This is followed by a representation of the grid world
+
+            S..........
+            XXXX.......
+            XX....X....
+            D..XX......
+
+            S: Start
+            D: Destination
+            X: Terminal
+            .: Regular
 
         Class Members:
-            self.pr = PR(ACTION | row, col, REQUESTED_ACTION)
-            ie the P(UP | 1, 2, DOWN) is the probability that the 
-            action preformed is down given the state and action.
-
-            self.reward(row, col, action) is the reward for preforming an 
-            action in some state.
-
-            self.terminal_states(row, col) <==> row,col is a terminal state
-
-            S : start = (1,1)
-            D : dest  = (3,3)
-            X : out of grid
-            |X|X|X|X|X|
-            |X|S|.|.|X|
-            |X|.|.|.|X|
-            |X|.|.|D|X|
-            |X|X|X|X|X|
+            self.terminal binary vector, where self.terminal[state] <==> state is terminal.
+            self.destination binary vector wehere self.destintation[state] <==> state is a destination
+            self.start is a scalar representing which state is the starting state (can only be one)
+            self.rows, self.cols: # of ros and cols
 
         """
-        assert rows > 1, "rows <= 1 is not valid"
-        assert cols > 1, "cols <= 1 is not valid"
-        
-        self.rows = rows
-        self.cols = cols
+        self.terminal           = -1
+        self.destination        = -1
+        self.start              = -1
+        self.rows               = -1
+        self.cols               = -1
+        self.states             = -1
+        self.step_reward        = -1
+        self.terminal_reward    = -1
+        self.destination_reward = -1
+        self.p_failure          = -1
 
-        self.states = (rows+2) * (cols+2)
+        self.SOS                = -1
+        self.PAD                = -1
+        self.n_tokens           = -1
+
+        self._read_file(gw_file)
+
+    def _build_action_probs(self):
+        """
+        self._action_probs[i] = PR(action | requested=i)
+        """
+        self._action_probs = np.zeros((4, 4))
+        for i in range(4):
+            self._action_probs[i][i] = 1-self.p_failure
+            for j in range(4):
+                if i == j: continue
+                self._action_probs[i][j] = self.p_failure/3
+
+    def _handle_parameters(self, parameters):
+        self.step_reward = int(parameters[0])
+        self.terminal_reward = int(parameters[1])
+        self.destination_reward = int(parameters[2])
+        self.p_failure = float(parameters[3])
+
+    def _handle_grid(self, grid):
+        self.rows = len(grid)
+        self.cols = len(grid[0])
+        self.states = self.rows * self.cols
         self.SOS = self.states+1
         self.PAD = self.states+2
+        self.n_tokens = self.states+3
+        self.terminal = np.zeros(self.rows*self.cols).astype(np.int32)
+        self.destination = np.zeros(self.rows*self.cols).astype(np.int32)
+        for i in range(self.rows):
+            assert len(grid[i]) == self.cols
+            for j in range(self.cols):
+                if grid[i][j] == "S":
+                    self.start = i*self.cols + j
+                elif grid[i][j] == "X":
+                    self.terminal[i*self.cols+j] = 1
+                elif grid[i][j] == "D":
+                    self.destination[i*self.cols+j] = 1
 
-        self._init_rewards()
-        self._init_terminal_states()
-        self.pr = softmax(np.random.randn(4, rows+2,cols+2, 4))
+        self._build_action_probs()
 
-    def _init_rewards(self):
-        self.rewards = -np.random.uniform(low=0, high=1, size=(self.rows+2, self.cols+2, 4))
-        self.rewards[self.rows, :, DOWN] = OUT_OF_BOUND_REWARD
-        self.rewards[:, self.cols, RIGHT] = OUT_OF_BOUND_REWARD
-        self.rewards[1, :, UP] = OUT_OF_BOUND_REWARD
-        self.rewards[:, 1, LEFT] = OUT_OF_BOUND_REWARD
-        self.rewards[self.rows-1, self.cols, DOWN] = WIN_REWARD
-        self.rewards[self.rows, self.cols-1, RIGHT] = WIN_REWARD
+    def _read_file(self, gw_file_path):
+        with open(gw_file_path, 'r')  as f:
+            lines = f.readlines()
+            lines = [line.strip() for line in lines]
+            assert len(lines) > 1
 
-    def _init_terminal_states(self):
-        self.terminal_states = np.zeros((self.rows+2, self.cols+2))
-        self.terminal_states[self.rows+1, :] = 1
-        self.terminal_states[0, :] = 1
-        self.terminal_states[:, self.cols+1] = 1
-        self.terminal_states[:, 0] = 1
+            parameters = lines[0].split(",")
+            self._handle_parameters(parameters)
+            self._handle_grid(lines[1:])
 
-    def get_state_idx(self, row, col):
-        """
-        Convert row, col to => 0 - self.states
-        each row, col pair maps to a unique number 
-        in this range. This is to represent the token_idx.
-        """
-        assert row >= 0 and row < self.rows+2, "OUT OF BOUNDS ROW"
-        assert col >= 0 and col < self.rows+2, "OUT OF BOUNDS ROW"
-        return row * (self.cols+2) + col
 
     def get_start_state(self, n):
-        return (np.ones((n,1)) * self.get_state_idx(1,1)).astype(np.int32)
+        return (np.ones((n,1)) * self.start).astype(np.int32)
+
 
     def preform_action(self, state, actions):
         """
-        Preform the randomly generated action on the state
+        State: current state
+        action: action to be preformed.
         """
-
         state = state.reshape(-1)
 
         is_up    = (actions==UP)
@@ -98,47 +131,42 @@ class RandomGridWorld():
         is_left  = (actions==LEFT)
         is_right = (actions==RIGHT)
 
-        action_up = state - (self.cols+2)
-        action_down = state + (self.cols+2)
+        action_up = state - self.cols
+        action_down = state + self.cols
         action_left = state - 1
         action_right = state + 1
         
         preformed_action = (is_up * action_up) + (is_down * action_down) + \
                 (is_left * action_left) + (is_right * action_right)
+        preformed_action = np.clip(preformed_action, 0, self.states-1)
 
-        terminal = self.terminal_states.reshape(-1)[state]
+        terminal = (self.terminal[state] | self.destination[state])
 
         return (terminal * state) + \
                 (np.logical_not(terminal) * preformed_action)
 
     def batched_step(self, state, action):
         """
-        state : (N, 6) current_state array
-        action: (N,) action array 
-        Returns (next_states, rewards, Terminal)
+        State: Current State (N, 1)
+        Action: Action requested by agent. (N,)
         """
         N = state.shape[0]
 
-        print("STATE", state)
-        print("ACTION", action)
-
-        row_idx = (state / (self.cols+2)).astype(np.int32).reshape(-1)
-        col_idx = (state % (self.cols+2)).astype(np.int32).reshape(-1)
-
-        print(row_idx)
-        print(col_idx)
-
-
-        probs = self.pr[:, row_idx, col_idx, action]
-        action_preformed = np.array([np.random.choice(a=4, p=probs[:,i]) \
+        action_preformed = np.array([np.random.choice(a=4, p=self._action_probs[action[i]]) \
                        for i in range(N)]).reshape(-1)
 
         preform_action = self.preform_action(state, action_preformed).astype(np.int32)
-        terminal = self.terminal_states.reshape(-1)
-        rewards = self.rewards[row_idx,  col_idx, action_preformed]
+
+        terminal = (self.terminal[preform_action] | self.destination[preform_action])
+        terminal = terminal.astype(np.int32)
+
+        terminal_rewards = (self.terminal[preform_action] * self.terminal_reward + \
+                            self.destination[preform_action] * self.destination_reward)
+
+        rewards = np.logical_not(terminal) * self.step_reward + terminal_rewards
 
 
-        return preform_action, rewards, (terminal[preform_action]).astype(np.int32)
+        return preform_action, rewards, terminal
 
 class basicMDP():
     """
