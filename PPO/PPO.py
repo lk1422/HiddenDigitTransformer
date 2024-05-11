@@ -3,6 +3,8 @@ import torch.nn as nn
 import torch.nn.functional as F
 import math
 
+
+
 class clippedLossVector(nn.Module):
 
     def __init__(self):
@@ -35,10 +37,6 @@ class clippedLossVector(nn.Module):
         actions = actions.to(torch.int32)
         eos_mask = eos_mask.to(torch.int32)
 
-
-        #pad_mask = torch.logical_not(tgt == pad_idx).to(torch.int64).to(device)
-        #eos_mask = torch.logical_not(eos_mask)
-
         policy, value = model(src, generated, value=True)
         policy_old    = model_old(src, generated)
         value = value[:, :-1]
@@ -57,6 +55,7 @@ class clippedLossVector(nn.Module):
 
         pi = policy[batch_index, state_index, actions]
         pi_old = policy_old[batch_index, state_index, actions]
+
         
         r = torch.exp(torch.log(pi) - torch.log(pi_old))
         r_clipped = torch.clamp(r, min=1-eps, max=1+eps)
@@ -85,10 +84,36 @@ class clippedLossVector(nn.Module):
 
 class clippedLossSequential(nn.Module):
 
-    def __init__(self):
+    def __init__(self, eps, c_1, c_2, pad_idx, device):
         super().__init__()
+        self.eps = eps
+        self.c_1 = c_1
+        self.c_2 = c_2
+        self.pad_idx = pad_idx
+        self.device = device
 
-    def forward(self, model, model_old, eps, c_1, c_2, src, generated, rewards, pad_idx, eos_idx, device):
+    def get_gae(self, rewards, eos_mask):
+        reward = rewards*eos_mask
+        return torch.cumsum(reward.flip(dims=[1]), dim=1).flip(dims=[1])
+
+    def forward(self, model, model_old, src, generated, actions, rewards, eos_mask):
+
+        generated = generated[:, :-1]
+
+        """
+        print("SRC")
+        print(src)
+        print("GENERATED")
+        print(generated)
+        print("ACTIONS")
+        print(actions)
+        print("REWARDS")
+        print(rewards)
+        print("EOS")
+        print(eos_mask)
+        """
+        
+
 
         model.eval()
         model_old.eval()
@@ -96,46 +121,61 @@ class clippedLossSequential(nn.Module):
         N = generated.shape[0]
         S = generated.shape[1]
 
-        eos_mask  = (generated==eos_idx)
-        first_eos = ((generated == eos_idx).cumsum(dim=1).cumsum(dim=1) == 1)
-        eos_mask = torch.logical_xor(eos_mask.cumsum(dim=1), first_eos)
-        eos_mask = torch.logical_not(eos_mask)
-
-        policy, value = model(src, generated, pad_idx, value=True)
-        policy_old    = model_old(src, generated, pad_idx)
+        policy, value = model(src, generated, self.pad_idx, value=True)
+        policy_old    = model_old(src, generated, self.pad_idx)
         policy = F.softmax(policy, dim=-1)
         policy_old = F.softmax(policy_old, dim=-1)
+
+        """
+        print("VALUE")
+        print(value)
+        print("POLICY")
+        print(policy)
+        print("POLICY OLD")
+        print(policy_old)
+        """
 
         entropy = -(policy*torch.log(policy)).sum(dim=-1)
         entropy_loss = (1/torch.numel(entropy)) * entropy.sum()
 
-        batch_index = torch.arange(N).unsqueeze(1).expand(N,S)
-        state_index = torch.arange(S).expand(N,S)
-        pi = policy[batch_index, state_index, generated]
-        pi_old = policy_old[batch_index, state_index, generated]
-        
+        batch_index = torch.arange(N).unsqueeze(1).expand(N,S).to(self.device)
+        state_index = torch.arange(S).expand(N,S).to(self.device)
+
+        pi = policy[batch_index, state_index, actions]
+        pi_old = policy_old[batch_index, state_index, actions]
+
+        """
+        print("PI")
+        print(pi)
+        print("PI_OLD")
+        print(pi_old)
+        """
+
         r = torch.exp(torch.log(pi) - torch.log(pi_old))
-        r_clipped = torch.clamp(r, min=1-eps, max=1+eps)
+        r_clipped = torch.clamp(r, min=1-self.eps, max=1+self.eps)
 
+        eos_mask_trimmed = eos_mask[:, :-1]
 
-        rewards = rewards.unsqueeze(1).expand(N,S)
+        gae = self.get_gae(rewards, eos_mask_trimmed).to(torch.float32)
         value = value.squeeze(-1)
-        A = (rewards - value)
+        A = (gae - value)
 
-        #l_clip = torch.min(r*A, r_clipped*A) 
-        l_clip = (torch.min(r*A, r_clipped*A) * eos_mask)
-        l_clip = l_clip.sum()/(N*eos_mask.sum())
+        l_clip = (torch.min(r*A, r_clipped*A) * eos_mask_trimmed)
+        l_clip = l_clip.sum()/(N*eos_mask_trimmed.sum())
 
-        rewards = rewards * eos_mask
-        value = value * eos_mask
-        rewards = rewards.reshape(-1,1) 
+        gae = gae * eos_mask_trimmed
+        value = value * eos_mask_trimmed
+        gae = gae.reshape(-1,1) 
         value   = value.reshape(-1,1)
 
-        l_value = F.mse_loss(value, rewards)
+        l_value = F.mse_loss(value, gae)
 
         model.train()
         model_old.train()
 
 
-        return -l_clip + c_1*l_value - c_2 * entropy_loss
+        
+        return -l_clip + self.c_1*l_value - self.c_2 * entropy_loss
+
+
 

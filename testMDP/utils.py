@@ -1,4 +1,5 @@
 import numpy as np
+import copy
 import torch
 import torch.nn.functional as F
 from torch.distributions.categorical import Categorical
@@ -13,13 +14,17 @@ def generate_sequence_grid_world(model, gw, batches, device):
     model.eval()
     max_iterations = gw.states
 
-    x = torch.tensor(gw.get_start_state(batches)).to(device)
+
+    valid_states = gw.get_non_terminal()
+    x = torch.tensor(np.random.choice(valid_states, size=(batches, 1))).to(device)
+
     generated_actions = []
-    tgt = [(torch.ones(batches, 1) * gw.SOS).to(device)]
+    tgt = [x]
     rewards = []
     acts = []
 
     for i in range(gw.states):
+    #for i in range(4):
         tgt_in = torch.cat(tgt, dim=1).to(torch.int32)
         policy = F.softmax(model(x, tgt_in, -1), dim=-1)[:,-1,:]
         distrib = Categorical(policy)
@@ -38,7 +43,7 @@ def generate_sequence_grid_world(model, gw, batches, device):
         rewards.append(torch.tensor(r).to(device))
         tgt.append(x_next)
 
-    tgt = torch.cat(tgt, dim=1)
+    tgt = torch.cat(tgt, dim=1).to(torch.int32)
     rewards = torch.stack(rewards, dim=1)
     acts = torch.stack(acts, dim=1)
     return x, tgt, rewards, acts
@@ -82,33 +87,35 @@ def generate_sequence(model, mdp, batches):
 
     return x, tgt, generated_actions.to(device), rewards.to(device)
 
-def trainPPO(model, device, mdp, epochs, sub_epochs, batch_size, eps, c_1, c_2, optim):
+def trainPPO(model, device, mdp, epochs, sub_epochs, batch_size, loss, optim):
     model_old = copy.deepcopy(model)
-    loss = clippedLossVector()
     losses = []
     rewards = []
     for e in range(epochs):
-        src, gen, acts, reward = generate_sequence(model, mdp, batch_size)
 
-        # Generate EOS mask
-        states = torch.argmax(gen, dim=-1)
-        eos = (states == 1) | (states == 2) | (states == 4)
-        first_eos = (eos.cumsum(dim=1) == 1)
-        eos_mask = torch.logical_xor(eos, first_eos)
-        eos_mask = torch.logical_not(eos_mask)
+        src, gen, reward, acts = generate_sequence_grid_world(model, mdp, batch_size, device)
+
+        eos_mask = get_eos_mask(mdp, gen).to(device)
+        eos_mask_trimmed = eos_mask[:, :-1]
+
+        d = torch.tensor(mdp.destination).to(device)
+        batch_success = (d[gen].sum(dim=-1) != 0)
+
+        prec_success = batch_success.sum() / batch_size
+        print("% OF DEST", round(prec_success.item(), 5))
 
         temp_model = copy.deepcopy(model)
         avg_loss = 0
         for s_e in range(sub_epochs):
             optim.zero_grad()
-            l = loss(model, model_old, eps, c_1, c_2, src, gen, acts, reward, eos_mask, device)
+            l = loss(model, model_old, src, gen, acts, reward, eos_mask)
             l.backward()
             optim.step()
             avg_loss+=l.item()
 
         avg_loss = avg_loss/sub_epochs
         losses.append(avg_loss)
-        avg_reward = reward.sum()/batch_size
+        avg_reward = (reward*eos_mask_trimmed).sum()/batch_size
         rewards.append(avg_reward.item())
         print("EPOCH", e+1)
         print("Average Loss", avg_loss)
@@ -116,6 +123,16 @@ def trainPPO(model, device, mdp, epochs, sub_epochs, batch_size, eps, c_1, c_2, 
         print("="*10)
 
         model_old = temp_model
-    torch.save(model.state_dict(), "temp_model3.pth")
+    torch.save(model.state_dict(), "temp_model.pth")
     return losses, rewards
 
+def get_eos_mask(gw, states):
+    states = states.cpu().numpy().astype(np.int32)
+    states[:, 0] = gw.start
+    eos = gw.terminal[states] | gw.destination[states]
+    eos = torch.tensor(eos)
+    eos_mask = eos
+    #first_eos = (eos.cumsum(dim=1) == 1)
+    #eos_mask = torch.logical_xor(eos, first_eos)
+    eos_mask = torch.logical_not(eos_mask)
+    return eos_mask

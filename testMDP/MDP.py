@@ -78,9 +78,9 @@ class GridWorld():
                 self._action_probs[i][j] = self.p_failure/3
 
     def _handle_parameters(self, parameters):
-        self.step_reward = int(parameters[0])
-        self.terminal_reward = int(parameters[1])
-        self.destination_reward = int(parameters[2])
+        self.step_reward = float(parameters[0])
+        self.terminal_reward = float(parameters[1])
+        self.destination_reward = float(parameters[2])
         self.p_failure = float(parameters[3])
 
     def _handle_grid(self, grid):
@@ -118,6 +118,9 @@ class GridWorld():
     def get_start_state(self, n):
         return (np.ones((n,1)) * self.start).astype(np.int32)
 
+    def get_non_terminal(self):
+        terminal = (self.terminal | self.destination)
+        return np.arange(0, self.states)[np.logical_not(terminal)]
 
     def preform_action(self, state, actions):
         """
