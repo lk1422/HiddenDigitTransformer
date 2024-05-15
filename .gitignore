@@ -1,2 +1,4 @@
 __pycache__/
 TicTacToe/
+*.pth
+*.pkl
