@@ -1,0 +1,1 @@
+Paper above was out final project for (Projects in Machine Learning and AI). We failed to implement a fully functional implementation of our idea before the deadline (PPO still had some minor bugs in it). This repository contains ongoing research into this new training methodology.
