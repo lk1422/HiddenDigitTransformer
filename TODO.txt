@@ -1,4 +1,11 @@
+NOTES:
+    -PPO HAS CONVERGED!!!!
+    -Not Consistently
 TODO:
-    -Create Basic Grid World MDP
-        * MAKE PPO CONVERGE PLZZ!!!!! (FIND THE BUG) :(
-    -Test PPO Transformer's optimal solution 
+    -Implement Hyperparameter Search Algorithm
+        *Bayesian Optimization
+    -Check if tuned hyper-parameters leads to consistent convergence of PPO
+        *If not there could possibly be another but effecting convergence.
+    - (After PPO is complete)
+    - Attempt new supervised pre-training approach
+    - Look into multi proccessing speed ups to create larger generated samples.

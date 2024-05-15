@@ -11,7 +11,7 @@ from .utils import *
 device = torch.device('cuda')
 
 def mainGridWorld():
-    gw = GridWorld("testMDP/easy.gw")
+    gw = GridWorld("testMDP/example.gw")
     model = BaseTokens(device, gw.n_tokens, gw.n_tokens, 4, dim=16, num_encoders=1, \
             num_decoders=1, d_feedforward=32).to(device)
     x, tgt, rewards, acts = generate_sequence_grid_world(model, gw, 2, device)
@@ -73,7 +73,7 @@ def experiment():
     print(v)
 
 def graph_metrics():
-    loss, reward, precentage = pickle.load(open("metrics.pkl", "rb"))
+    loss, reward, precentage = pickle.load(open("testMDP/aux/metrics_4.pkl", "rb"))
     precentage = [prec.item() for prec in precentage]
     T = [i for i in range(len(loss))]
     fig, ax = plt.subplots(3)
@@ -97,4 +97,4 @@ def graph_metrics():
 
 
 if __name__ == "__main__":
-    experiment()
+    graph_metrics()
