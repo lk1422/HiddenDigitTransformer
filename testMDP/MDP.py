@@ -6,7 +6,6 @@ RIGHT = 1
 UP    = 2
 DOWN  = 3
 
-
 class GridWorld():
     """
     Slightly More complicated RL Enviorment.

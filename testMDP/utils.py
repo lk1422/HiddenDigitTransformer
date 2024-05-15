@@ -22,6 +22,7 @@ def generate_sequence_grid_world(model, gw, batches, device):
     tgt = [x]
     rewards = []
     acts = []
+    completed = torch.zeros(batches).to(device)
 
     for i in range(gw.states):
     #for i in range(4):
@@ -37,11 +38,13 @@ def generate_sequence_grid_world(model, gw, batches, device):
 
         #print(state_mdp)
 
-        x_next, r, _ = gw.batched_step(state_mdp, actions)
+        x_next, r, t = gw.batched_step(state_mdp, actions)
         x_next = torch.tensor(x_next).to(device).unsqueeze(1)
 
         rewards.append(torch.tensor(r).to(device))
         tgt.append(x_next)
+
+        if (t.all()): break
 
     tgt = torch.cat(tgt, dim=1).to(torch.int32)
     rewards = torch.stack(rewards, dim=1)
@@ -91,6 +94,7 @@ def trainPPO(model, device, mdp, epochs, sub_epochs, batch_size, loss, optim):
     model_old = copy.deepcopy(model)
     losses = []
     rewards = []
+    success = []
     for e in range(epochs):
 
         src, gen, reward, acts = generate_sequence_grid_world(model, mdp, batch_size, device)
@@ -102,29 +106,34 @@ def trainPPO(model, device, mdp, epochs, sub_epochs, batch_size, loss, optim):
         batch_success = (d[gen].sum(dim=-1) != 0)
 
         prec_success = batch_success.sum() / batch_size
+        success.append(prec_success)
         print("% OF DEST", round(prec_success.item(), 5))
 
         temp_model = copy.deepcopy(model)
         avg_loss = 0
+        avg_MSE_loss = 0
         for s_e in range(sub_epochs):
             optim.zero_grad()
-            l = loss(model, model_old, src, gen, acts, reward, eos_mask)
+            l, l_f = loss(model, model_old, src, gen, acts, reward, eos_mask)
             l.backward()
             optim.step()
             avg_loss+=l.item()
+            avg_MSE_loss += l_f
 
         avg_loss = avg_loss/sub_epochs
+        avg_MSE_loss = avg_MSE_loss / sub_epochs
         losses.append(avg_loss)
         avg_reward = (reward*eos_mask_trimmed).sum()/batch_size
         rewards.append(avg_reward.item())
         print("EPOCH", e+1)
         print("Average Loss", avg_loss)
+        print("Average MSE Loss", avg_MSE_loss)
         print("Average Reward", avg_reward)
         print("="*10)
 
         model_old = temp_model
     torch.save(model.state_dict(), "temp_model.pth")
-    return losses, rewards
+    return losses, rewards, success
 
 def get_eos_mask(gw, states):
     states = states.cpu().numpy().astype(np.int32)
